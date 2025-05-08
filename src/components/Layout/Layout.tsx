@@ -15,23 +15,39 @@ const Layout: React.FC = () => {
   useEffect(() => {
     // For path matching, we just check if the path starts with /explore or /bookshelf
     if (location.pathname.startsWith('/bookshelf')) {
-      // Get last bookshelf tab from cookies
-      const lastTab = getLastBookshelfTab();
-      if (lastTab) {
-        // The actual tab switching is handled in the Bookshelf component
-        // This just ensures cookies are working
-        saveLastBookshelfTab(lastTab);
+      // Get tab from URL parameters (if any)
+      const urlParams = new URLSearchParams(location.search);
+      const tabFromUrl = urlParams.get('tab');
+      
+      if (tabFromUrl) {
+        // Save the tab from URL to cookies
+        saveLastBookshelfTab(tabFromUrl);
+      } else {
+        // Get last bookshelf tab from cookies
+        const lastTab = getLastBookshelfTab();
+        if (lastTab) {
+          // Ensure cookies are working
+          saveLastBookshelfTab(lastTab);
+        }
       }
     } else if (location.pathname.startsWith('/explore')) {
-      // Get last explore tab from cookies
-      const lastTab = getLastExploreTab();
-      if (lastTab) {
-        // The actual tab switching is handled in the Explore component
-        // This just ensures cookies are working
-        saveLastExploreTab(lastTab);
+      // Get tab from URL parameters (if any)
+      const urlParams = new URLSearchParams(location.search);
+      const tabFromUrl = urlParams.get('tab');
+      
+      if (tabFromUrl) {
+        // Save the tab from URL to cookies
+        saveLastExploreTab(tabFromUrl);
+      } else {
+        // Get last explore tab from cookies
+        const lastTab = getLastExploreTab();
+        if (lastTab) {
+          // Ensure cookies are working
+          saveLastExploreTab(lastTab);
+        }
       }
     }
-  }, [location.pathname]);
+  }, [location.pathname, location.search]);
   
   return (
     <div className="flex flex-col min-h-screen">

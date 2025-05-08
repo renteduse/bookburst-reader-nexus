@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Book, booksAPI } from '@/services/api';
 import { toast } from '@/components/ui/sonner';
-import { MultiSelect } from '@/components/ui/multi-select';
+import { Checkbox } from "@/components/ui/checkbox";
 
 const AddBookForm: React.FC<{
   onSuccess?: (book: Book) => void;
@@ -40,10 +40,12 @@ const AddBookForm: React.FC<{
     }));
   };
 
-  const handleGenreChange = (selectedGenres: string[]) => {
+  const handleGenreChange = (genre: string, checked: boolean) => {
     setFormData(prev => ({
       ...prev,
-      genre: selectedGenres
+      genre: checked 
+        ? [...prev.genre, genre] 
+        : prev.genre.filter(g => g !== genre)
     }));
   };
 
@@ -190,13 +192,24 @@ const AddBookForm: React.FC<{
       </div>
       
       <div>
-        <Label htmlFor="genre">Genres</Label>
-        <MultiSelect
-          options={genreOptions.map(g => ({ label: g, value: g }))}
-          selected={formData.genre.map(g => ({ label: g, value: g }))}
-          onChange={selectedItems => handleGenreChange(selectedItems.map(item => item.value))}
-          placeholder="Select genres"
-        />
+        <Label>Genres</Label>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
+          {genreOptions.map((genre) => (
+            <div key={genre} className="flex items-center space-x-2">
+              <Checkbox 
+                id={`genre-${genre}`} 
+                checked={formData.genre.includes(genre)} 
+                onCheckedChange={(checked) => handleGenreChange(genre, checked === true)}
+              />
+              <Label 
+                htmlFor={`genre-${genre}`}
+                className="text-sm font-normal cursor-pointer"
+              >
+                {genre}
+              </Label>
+            </div>
+          ))}
+        </div>
       </div>
       
       <Button 

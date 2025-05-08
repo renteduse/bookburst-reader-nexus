@@ -1,15 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Book, Review, booksAPI, reviewsAPI, bookshelfAPI, BookShelfItem } from '@/services/api';
-import { useAuth } from '@/contexts/AuthContext';
+import { useParams, Link } from 'react-router-dom';
+import { Book, ReadingStatus, bookshelfAPI, booksAPI, Review, reviewsAPI } from '@/services/api';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/components/ui/sonner';
+import { Star, StarHalf, StarOff, BookOpen, BookPlus } from 'lucide-react';
 import ReviewCard from '@/components/Reviews/ReviewCard';
-import { BookOpen, Check, Plus, Star } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -17,16 +15,16 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogFooter,
 } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
+} from "@/components/ui/select";
 import {
   Pagination,
   PaginationContent,
@@ -36,188 +34,202 @@ import {
   PaginationPrevious,
 } from '@/components/ui/pagination';
 
-const BookDetail: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
-  const { isAuthenticated } = useAuth();
-  const navigate = useNavigate();
+const BookDetail = () => {
+  const { bookId } = useParams<{ bookId: string }>();
+  const { isAuthenticated, user } = useAuth();
   
   const [book, setBook] = useState<Book | null>(null);
+  const [bookshelfItem, setBookshelfItem] = useState<any | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [reviewsLoading, setReviewsLoading] = useState(true);
   const [reviews, setReviews] = useState<Review[]>([]);
-  const [bookshelfItem, setBookshelfItem] = useState<BookShelfItem | null>(null);
-  const [isLoadingBook, setIsLoadingBook] = useState(true);
-  const [isLoadingReviews, setIsLoadingReviews] = useState(true);
-  const [isLoadingBookshelfItem, setIsLoadingBookshelfItem] = useState(true);
-  
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const [userHasReviewed, setUserHasReviewed] = useState(false);
+  const [reviewsPage, setReviewsPage] = useState(1);
+  const [totalReviewPages, setTotalReviewPages] = useState(1);
   
   // Review form state
-  const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
+  const [reviewFormOpen, setReviewFormOpen] = useState(false);
   const [reviewContent, setReviewContent] = useState('');
-  const [reviewRating, setReviewRating] = useState<number>(0);
-  const [isRecommended, setIsRecommended] = useState(true);
-  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [reviewRating, setReviewRating] = useState<number>(5);
+  const [reviewRecommend, setReviewRecommend] = useState<boolean>(true);
+  const [submittingReview, setSubmittingReview] = useState(false);
   
-  // Add to bookshelf dialog state
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState<string>('want-to-read');
-  const [isAddingToBookshelf, setIsAddingToBookshelf] = useState(false);
+  // Add to bookshelf state
+  const [addToShelfDialogOpen, setAddToShelfDialogOpen] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState<ReadingStatus>('want-to-read');
+  const [isAddingToShelf, setIsAddingToShelf] = useState(false);
   
-  // Fetch book details
+  // Load book details
   useEffect(() => {
     const fetchBookDetails = async () => {
-      if (!id) return;
+      if (!bookId) return;
       
-      setIsLoadingBook(true);
       try {
-        const bookData = await booksAPI.getBookDetails(id);
+        setLoading(true);
+        const bookData = await booksAPI.getBookDetails(bookId);
         setBook(bookData);
-        document.title = `${bookData.title} - BookBurst`;
+        
+        // Check if book is in user's bookshelf if authenticated
+        if (isAuthenticated) {
+          try {
+            const bookshelfData = await bookshelfAPI.getMyBooks();
+            const foundItem = bookshelfData.books.find((item: any) => 
+              item.book._id === bookId
+            );
+            
+            if (foundItem) {
+              setBookshelfItem(foundItem);
+            }
+          } catch (error) {
+            console.error('Error checking bookshelf:', error);
+          }
+        }
       } catch (error) {
         console.error('Error fetching book details:', error);
-        toast.error('Failed to load book details.');
-        navigate('/explore');
+        toast.error('Could not load book details');
       } finally {
-        setIsLoadingBook(false);
+        setLoading(false);
       }
     };
     
     fetchBookDetails();
-  }, [id, navigate]);
+  }, [bookId, isAuthenticated]);
   
-  // Fetch reviews with pagination
+  // Load book reviews
   useEffect(() => {
     const fetchReviews = async () => {
-      if (!id) return;
+      if (!bookId) return;
       
-      setIsLoadingReviews(true);
       try {
-        const reviewData = await reviewsAPI.getBookReviews(id, currentPage);
-        setReviews(reviewData.reviews);
-        setTotalPages(reviewData.pages);
+        setReviewsLoading(true);
+        const response = await reviewsAPI.getBookReviews(bookId, reviewsPage);
+        setReviews(response.reviews);
+        setTotalReviewPages(response.pages);
+        
+        // Check if the current user has already reviewed this book
+        if (isAuthenticated && user?._id) {
+          const userReview = response.reviews.find((review: Review) => 
+            review.user._id === user._id
+          );
+          setUserHasReviewed(!!userReview);
+        }
       } catch (error) {
         console.error('Error fetching reviews:', error);
-        toast.error('Failed to load reviews.');
+        toast.error('Could not load reviews');
       } finally {
-        setIsLoadingReviews(false);
+        setReviewsLoading(false);
       }
     };
     
     fetchReviews();
-  }, [id, currentPage]);
+  }, [bookId, reviewsPage, isAuthenticated, user]);
   
-  // Fetch user's bookshelf item for this book if authenticated
-  useEffect(() => {
-    const fetchBookshelfItem = async () => {
-      if (!id || !isAuthenticated) {
-        setIsLoadingBookshelfItem(false);
-        return;
-      }
-      
-      setIsLoadingBookshelfItem(true);
-      try {
-        const response = await bookshelfAPI.getMyBooks();
-        const item = response.books.find((item) => item.book._id === id);
-        setBookshelfItem(item || null);
-      } catch (error) {
-        console.error('Error fetching bookshelf item:', error);
-      } finally {
-        setIsLoadingBookshelfItem(false);
-      }
-    };
-    
-    fetchBookshelfItem();
-  }, [id, isAuthenticated]);
-  
-  // Check if user has already reviewed this book
-  const hasUserReviewed = reviews.some(review => 
-    review.user._id === (isAuthenticated ? JSON.parse(localStorage.getItem('bookburstUser') || '{}')._id : null)
-  );
-  
-  // Handle adding book to shelf
-  const handleAddToShelf = async () => {
-    if (!book || !isAuthenticated) return;
-    
-    setIsAddingToBookshelf(true);
-    try {
-      const newBookshelfItem = await bookshelfAPI.addToBookshelf({
-        bookId: book._id,
-        status: selectedStatus as any
-      });
-      
-      setBookshelfItem(newBookshelfItem);
-      toast.success(`Added to your ${selectedStatus.replace('-', ' ')} shelf!`);
-      setIsAddDialogOpen(false);
-    } catch (error) {
-      console.error('Error adding to shelf:', error);
-      toast.error('Failed to add book to your shelf.');
-    } finally {
-      setIsAddingToBookshelf(false);
-    }
-  };
-  
-  // Handle updating book status
-  const handleUpdateStatus = async (status: string) => {
-    if (!bookshelfItem || !isAuthenticated) return;
-    
-    try {
-      const updatedItem = await bookshelfAPI.updateBookStatus(
-        bookshelfItem._id,
-        status as any
-      );
-      
-      setBookshelfItem(updatedItem);
-      toast.success(`Moved to your ${status.replace('-', ' ')} shelf!`);
-    } catch (error) {
-      console.error('Error updating status:', error);
-      toast.error('Failed to update book status.');
-    }
-  };
-  
-  // Handle submitting a review
-  const handleSubmitReview = async () => {
-    if (!book || !isAuthenticated || !reviewContent.trim() || reviewRating === 0) {
-      toast.error('Please provide both a rating and review content.');
+  const handleAddToBookshelf = async () => {
+    if (!isAuthenticated) {
+      toast.error('Please log in to add books to your shelf');
       return;
     }
     
-    setIsSubmittingReview(true);
     try {
-      const newReview = await reviewsAPI.createReview({
-        bookId: book._id,
+      setIsAddingToShelf(true);
+      
+      if (bookshelfItem) {
+        // Update status if already in bookshelf
+        await bookshelfAPI.updateBookStatus(bookshelfItem._id, selectedStatus);
+        setBookshelfItem({
+          ...bookshelfItem,
+          status: selectedStatus
+        });
+        toast.success(`Book status updated to "${selectedStatus.replace(/-/g, ' ')}"`);
+      } else {
+        // Add to bookshelf
+        const response = await bookshelfAPI.addToBookshelf({
+          bookId,
+          status: selectedStatus
+        });
+        setBookshelfItem(response);
+        toast.success(`Book added to your "${selectedStatus.replace(/-/g, ' ')}" shelf`);
+      }
+      
+      setAddToShelfDialogOpen(false);
+    } catch (error: any) {
+      console.error('Error updating bookshelf:', error);
+      
+      // Check for error message about book already added
+      if (error.message && error.message.includes('already')) {
+        toast.error('This book is already in your bookshelf');
+      } else {
+        toast.error('Failed to update bookshelf');
+      }
+    } finally {
+      setIsAddingToShelf(false);
+    }
+  };
+  
+  const handleSubmitReview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!isAuthenticated) {
+      toast.error('Please log in to submit a review');
+      return;
+    }
+    
+    if (!reviewContent.trim()) {
+      toast.error('Review content cannot be empty');
+      return;
+    }
+    
+    try {
+      setSubmittingReview(true);
+      
+      await reviewsAPI.createReview({
+        bookId: bookId!,
         rating: reviewRating,
         content: reviewContent,
-        recommend: isRecommended
+        recommend: reviewRecommend
       });
       
-      // Refresh the reviews list to include the new review
-      const reviewData = await reviewsAPI.getBookReviews(id!, 1);
-      setReviews(reviewData.reviews);
-      setCurrentPage(1);
-      setTotalPages(reviewData.pages);
+      toast.success('Your review has been posted!');
+      setUserHasReviewed(true);
+      setReviewFormOpen(false);
       
-      toast.success('Your review has been published!');
-      setIsReviewDialogOpen(false);
-      setReviewContent('');
-      setReviewRating(0);
+      // Refresh reviews
+      const response = await reviewsAPI.getBookReviews(bookId!, 1);
+      setReviews(response.reviews);
+      setTotalReviewPages(response.pages);
+      setReviewsPage(1);
     } catch (error) {
       console.error('Error submitting review:', error);
-      toast.error('Failed to submit your review.');
+      toast.error('Failed to submit review');
     } finally {
-      setIsSubmittingReview(false);
+      setSubmittingReview(false);
+    }
+  };
+  
+  const getStatusBadge = () => {
+    if (!bookshelfItem) return null;
+    
+    switch(bookshelfItem.status) {
+      case 'reading':
+        return <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-md text-xs">Currently Reading</span>;
+      case 'finished':
+        return <span className="bg-green-100 text-green-800 px-2 py-1 rounded-md text-xs">Finished</span>;
+      case 'want-to-read':
+        return <span className="bg-amber-100 text-amber-800 px-2 py-1 rounded-md text-xs">Want to Read</span>;
+      default:
+        return null;
     }
   };
   
   const handlePageChange = (page: number) => {
-    if (page < 1 || page > totalPages) return;
-    setCurrentPage(page);
+    if (page < 1 || page > totalReviewPages) return;
+    setReviewsPage(page);
   };
   
-  if (isLoadingBook) {
+  if (loading) {
     return (
-      <div className="container mx-auto px-4 py-12 flex justify-center items-center">
-        <div className="text-center">
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex justify-center items-center h-64">
           <p>Loading book details...</p>
         </div>
       </div>
@@ -226,13 +238,12 @@ const BookDetail: React.FC = () => {
   
   if (!book) {
     return (
-      <div className="container mx-auto px-4 py-12 flex justify-center items-center">
-        <div className="text-center">
-          <h2 className="font-serif text-2xl font-bold text-bookburst-navy mb-4">Book not found</h2>
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex flex-col items-center justify-center h-64">
+          <h2 className="text-2xl font-serif mb-4">Book Not Found</h2>
+          <p className="mb-6 text-gray-600">The book you're looking for doesn't exist or has been removed.</p>
           <Link to="/explore">
-            <Button className="bg-bookburst-amber text-bookburst-navy hover:bg-bookburst-amber/90">
-              Explore Books
-            </Button>
+            <Button>Explore Books</Button>
           </Link>
         </div>
       </div>
@@ -241,370 +252,350 @@ const BookDetail: React.FC = () => {
   
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <Link to="/explore" className="text-bookburst-navy hover:text-bookburst-amber font-medium">
-          &larr; Back to Explore
-        </Link>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-8 mb-12">
-        {/* Book Cover */}
-        <div className="md:col-span-4 lg:col-span-3">
-          <div className="sticky top-24">
-            <img
-              src={book.coverImage || '/placeholder.svg'}
-              alt={`${book.title} cover`}
-              className="w-full rounded-lg shadow-lg max-h-[500px] object-contain mx-auto"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = '/placeholder.svg';
-              }}
-            />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {/* Book Cover and Add to Shelf */}
+        <div className="md:col-span-1">
+          <div className="flex flex-col items-center md:items-start">
+            <div className="w-48 h-72 bg-gray-100 rounded-md overflow-hidden mb-4">
+              {book.coverImage ? (
+                <img 
+                  src={book.coverImage} 
+                  alt={`${book.title} cover`} 
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gray-200 text-gray-600">
+                  No Cover Image
+                </div>
+              )}
+            </div>
             
-            {isAuthenticated && !isLoadingBookshelfItem && (
-              <div className="mt-6 space-y-4">
+            {isAuthenticated && (
+              <>
                 {bookshelfItem ? (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-center bg-bookburst-amber/20 text-bookburst-navy rounded-lg p-3">
-                      <BookOpen className="h-5 w-5 mr-2" />
-                      <span className="font-medium">
-                        {bookshelfItem.status === 'reading' ? 'Currently Reading' :
-                         bookshelfItem.status === 'finished' ? 'Finished Reading' :
-                         'Want to Read'}
-                      </span>
+                  <div className="space-y-3 w-full">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">On your shelf:</span>
+                      {getStatusBadge()}
                     </div>
                     
-                    <Select
-                      value={bookshelfItem.status}
-                      onValueChange={handleUpdateStatus}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Change status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="reading">Currently Reading</SelectItem>
-                        <SelectItem value="finished">Finished Reading</SelectItem>
-                        <SelectItem value="want-to-read">Want to Read</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Dialog open={addToShelfDialogOpen} onOpenChange={setAddToShelfDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button 
+                          className="w-full bg-bookburst-teal text-white hover:bg-bookburst-teal/90"
+                        >
+                          <BookOpen className="mr-2 h-4 w-4" />
+                          Change Status
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Update Reading Status</DialogTitle>
+                          <DialogDescription>
+                            Change the status of "{book.title}" in your bookshelf
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="status">Reading Status</Label>
+                            <Select 
+                              value={selectedStatus} 
+                              onValueChange={(value) => setSelectedStatus(value as ReadingStatus)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select status" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="reading">Currently Reading</SelectItem>
+                                <SelectItem value="finished">Finished</SelectItem>
+                                <SelectItem value="want-to-read">Want to Read</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <Button 
+                            onClick={handleAddToBookshelf} 
+                            disabled={isAddingToShelf}
+                            className="w-full"
+                          >
+                            {isAddingToShelf ? 'Updating...' : 'Update Status'}
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
                   </div>
                 ) : (
-                  <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                  <Dialog open={addToShelfDialogOpen} onOpenChange={setAddToShelfDialogOpen}>
                     <DialogTrigger asChild>
-                      <Button className="w-full bg-bookburst-amber text-bookburst-navy hover:bg-bookburst-amber/90">
-                        <Plus className="mr-2 h-4 w-4" /> Add to My Shelf
+                      <Button 
+                        className="w-full bg-bookburst-amber text-bookburst-navy hover:bg-bookburst-amber/90"
+                      >
+                        <BookPlus className="mr-2 h-4 w-4" />
+                        Add to My Bookshelf
                       </Button>
                     </DialogTrigger>
                     <DialogContent>
                       <DialogHeader>
-                        <DialogTitle>Add to Your Shelf</DialogTitle>
+                        <DialogTitle>Add to Bookshelf</DialogTitle>
                         <DialogDescription>
-                          Add "{book.title}" to your bookshelf.
+                          Add "{book.title}" to your personal bookshelf
                         </DialogDescription>
                       </DialogHeader>
-                      
-                      <div className="py-4">
-                        <Label htmlFor="status">Reading Status</Label>
-                        <Select
-                          value={selectedStatus}
-                          onValueChange={setSelectedStatus}
-                        >
-                          <SelectTrigger id="status" className="w-full mt-2">
-                            <SelectValue placeholder="Select status" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="reading">Currently Reading</SelectItem>
-                            <SelectItem value="finished">Finished Reading</SelectItem>
-                            <SelectItem value="want-to-read">Want to Read</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      
-                      <DialogFooter>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="status">Reading Status</Label>
+                          <Select 
+                            value={selectedStatus} 
+                            onValueChange={(value) => setSelectedStatus(value as ReadingStatus)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="want-to-read">Want to Read</SelectItem>
+                              <SelectItem value="reading">Currently Reading</SelectItem>
+                              <SelectItem value="finished">Finished</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                         <Button 
-                          onClick={handleAddToShelf} 
-                          disabled={isAddingToBookshelf}
-                          className="bg-bookburst-amber text-bookburst-navy hover:bg-bookburst-amber/90"
+                          onClick={handleAddToBookshelf} 
+                          disabled={isAddingToShelf}
+                          className="w-full"
                         >
-                          {isAddingToBookshelf ? 'Adding...' : 'Add to Shelf'}
+                          {isAddingToShelf ? 'Adding...' : 'Add to Bookshelf'}
                         </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-                )}
-                
-                {(!hasUserReviewed && bookshelfItem?.status === 'finished') && (
-                  <Dialog open={isReviewDialogOpen} onOpenChange={setIsReviewDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button variant="outline" className="w-full border-bookburst-navy text-bookburst-navy">
-                        <Star className="mr-2 h-4 w-4" /> Write a Review
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[600px]">
-                      <DialogHeader>
-                        <DialogTitle>Review {book.title}</DialogTitle>
-                        <DialogDescription>
-                          Share your thoughts about this book with the community.
-                        </DialogDescription>
-                      </DialogHeader>
-                      
-                      <div className="space-y-6 py-4">
-                        <div className="space-y-2">
-                          <Label>Your Rating</Label>
-                          <div className="flex items-center gap-1">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <Star
-                                key={star}
-                                className={`h-8 w-8 cursor-pointer transition-colors ${
-                                  star <= reviewRating
-                                    ? 'text-bookburst-amber fill-bookburst-amber'
-                                    : 'text-gray-300 hover:text-gray-400'
-                                }`}
-                                onClick={() => setReviewRating(star)}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <Label htmlFor="review">Your Review</Label>
-                          <Textarea
-                            id="review"
-                            placeholder="Share your thoughts about this book..."
-                            value={reviewContent}
-                            onChange={(e) => setReviewContent(e.target.value)}
-                            rows={6}
-                          />
-                        </div>
-                        
-                        <div className="flex items-center space-x-2">
-                          <Checkbox
-                            id="recommend"
-                            checked={isRecommended}
-                            onCheckedChange={(checked) => 
-                              setIsRecommended(checked as boolean)
-                            }
-                          />
-                          <Label htmlFor="recommend" className="text-sm font-normal">
-                            I recommend this book
-                          </Label>
-                        </div>
                       </div>
-                      
-                      <DialogFooter>
-                        <Button
-                          onClick={handleSubmitReview}
-                          disabled={isSubmittingReview || !reviewContent.trim() || reviewRating === 0}
-                          className="bg-bookburst-amber text-bookburst-navy hover:bg-bookburst-amber/90"
-                        >
-                          {isSubmittingReview ? 'Submitting...' : 'Submit Review'}
-                        </Button>
-                      </DialogFooter>
                     </DialogContent>
                   </Dialog>
                 )}
-              </div>
-            )}
-            
-            {isAuthenticated === false && (
-              <div className="mt-6 space-y-4">
-                <Link to="/login">
-                  <Button className="w-full bg-bookburst-amber text-bookburst-navy hover:bg-bookburst-amber/90">
-                    Log in to add to shelf
-                  </Button>
-                </Link>
-              </div>
+              </>
             )}
           </div>
         </div>
         
         {/* Book Details */}
-        <div className="md:col-span-8 lg:col-span-9">
+        <div className="md:col-span-2">
           <h1 className="font-serif text-3xl md:text-4xl font-bold text-bookburst-navy mb-2">
             {book.title}
           </h1>
+          <h2 className="text-xl text-gray-700 mb-4">by {book.author}</h2>
           
-          <p className="text-xl text-gray-700 mb-4">by {book.author}</p>
-          
-          <div className="flex items-center space-x-4 mb-8">
-            {/* Average rating display would go here if we had that data */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
             {book.pageCount && (
-              <span className="text-gray-600">{book.pageCount} pages</span>
-            )}
-            {book.publishedDate && (
-              <span className="text-gray-600">
-                Published {new Date(book.publishedDate).getFullYear()}
-              </span>
-            )}
-            {book.publisher && (
-              <span className="text-gray-600">Publisher: {book.publisher}</span>
-            )}
-          </div>
-          
-          <div className="mb-8">
-            <h2 className="font-serif text-xl font-semibold mb-3">About this book</h2>
-            <div className="prose max-w-none">
-              <p className="text-gray-700">{book.description}</p>
-            </div>
-          </div>
-          
-          <Tabs defaultValue="reviews" className="w-full">
-            <TabsList>
-              <TabsTrigger value="reviews">Reviews</TabsTrigger>
-              <TabsTrigger value="details">Book Details</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="reviews" className="w-full pt-6">
-              <h2 className="font-serif text-2xl font-semibold mb-6">
-                Reviews
-              </h2>
-              
-              {isLoadingReviews ? (
-                <div className="flex justify-center items-center h-32">
-                  Loading reviews...
-                </div>
-              ) : reviews.length === 0 ? (
-                <div className="text-center py-8 border border-gray-200 rounded-lg">
-                  <h3 className="font-serif text-lg font-medium text-gray-600 mb-2">
-                    No reviews yet
-                  </h3>
-                  <p className="text-gray-500 mb-6">
-                    Be the first to review this book!
-                  </p>
-                  
-                  {isAuthenticated ? (
-                    bookshelfItem?.status === 'finished' ? (
-                      <Button
-                        onClick={() => setIsReviewDialogOpen(true)}
-                        className="bg-bookburst-amber text-bookburst-navy hover:bg-bookburst-amber/90"
-                      >
-                        <Star className="mr-2 h-4 w-4" /> Write a Review
-                      </Button>
-                    ) : (
-                      <p className="text-sm text-gray-500">
-                        Mark this book as "Finished" to write a review
-                      </p>
-                    )
-                  ) : (
-                    <Link to="/login">
-                      <Button className="bg-bookburst-amber text-bookburst-navy hover:bg-bookburst-amber/90">
-                        Log in to write a review
-                      </Button>
-                    </Link>
-                  )}
-                </div>
-              ) : (
-                <>
-                  <div className="space-y-6">
-                    {reviews.map((review) => (
-                      <ReviewCard key={review._id} review={review} />
-                    ))}
-                  </div>
-                  
-                  {/* Pagination for reviews */}
-                  {totalPages > 1 && (
-                    <Pagination className="my-6">
-                      <PaginationContent>
-                        <PaginationItem>
-                          <PaginationPrevious 
-                            onClick={() => handlePageChange(currentPage - 1)}
-                            className={currentPage <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                          />
-                        </PaginationItem>
-                        
-                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                          // Show pages around current page
-                          let pageNum;
-                          if (totalPages <= 5) {
-                            pageNum = i + 1;
-                          } else if (currentPage <= 3) {
-                            pageNum = i + 1;
-                          } else if (currentPage >= totalPages - 2) {
-                            pageNum = totalPages - 4 + i;
-                          } else {
-                            pageNum = currentPage - 2 + i;
-                          }
-                          
-                          return (
-                            <PaginationItem key={pageNum}>
-                              <PaginationLink 
-                                onClick={() => handlePageChange(pageNum)}
-                                isActive={pageNum === currentPage}
-                                className="cursor-pointer"
-                              >
-                                {pageNum}
-                              </PaginationLink>
-                            </PaginationItem>
-                          );
-                        })}
-                        
-                        <PaginationItem>
-                          <PaginationNext 
-                            onClick={() => handlePageChange(currentPage + 1)}
-                            className={currentPage >= totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                          />
-                        </PaginationItem>
-                      </PaginationContent>
-                    </Pagination>
-                  )}
-                </>
-              )}
-            </TabsContent>
-            
-            <TabsContent value="details" className="w-full pt-6">
-              <h2 className="font-serif text-2xl font-semibold mb-6">
-                Book Details
-              </h2>
-              
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {book.isbn && (
-                    <div>
-                      <h3 className="font-medium text-gray-700">ISBN</h3>
-                      <p>{book.isbn}</p>
-                    </div>
-                  )}
-                  
-                  {book.publisher && (
-                    <div>
-                      <h3 className="font-medium text-gray-700">Publisher</h3>
-                      <p>{book.publisher}</p>
-                    </div>
-                  )}
-                  
-                  {book.publishedDate && (
-                    <div>
-                      <h3 className="font-medium text-gray-700">Publication Date</h3>
-                      <p>{new Date(book.publishedDate).toLocaleDateString()}</p>
-                    </div>
-                  )}
-                  
-                  {book.pageCount && (
-                    <div>
-                      <h3 className="font-medium text-gray-700">Page Count</h3>
-                      <p>{book.pageCount} pages</p>
-                    </div>
-                  )}
-                </div>
-                
-                {book.genre && book.genre.length > 0 && (
-                  <div>
-                    <h3 className="font-medium text-gray-700">Genres</h3>
-                    <div className="flex flex-wrap gap-2 mt-1">
-                      {book.genre.map((genre) => (
-                        <span
-                          key={genre}
-                          className="inline-block bg-bookburst-teal/10 text-bookburst-navy px-3 py-1 rounded-full text-sm"
-                        >
-                          {genre}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
+              <div>
+                <span className="text-sm text-gray-500">Pages</span>
+                <p>{book.pageCount}</p>
               </div>
-            </TabsContent>
-          </Tabs>
+            )}
+            
+            {book.publishedDate && (
+              <div>
+                <span className="text-sm text-gray-500">Published</span>
+                <p>{new Date(book.publishedDate).getFullYear()}</p>
+              </div>
+            )}
+            
+            {book.publisher && (
+              <div>
+                <span className="text-sm text-gray-500">Publisher</span>
+                <p>{book.publisher}</p>
+              </div>
+            )}
+            
+            {book.isbn && (
+              <div>
+                <span className="text-sm text-gray-500">ISBN</span>
+                <p>{book.isbn}</p>
+              </div>
+            )}
+          </div>
+          
+          {book.genre && book.genre.length > 0 && (
+            <div className="mb-6">
+              <span className="text-sm text-gray-500 block mb-2">Genres</span>
+              <div className="flex flex-wrap gap-2">
+                {book.genre.map((genre, index) => (
+                  <span 
+                    key={index} 
+                    className="bg-gray-100 px-3 py-1 rounded-full text-sm"
+                  >
+                    {genre}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {book.description && (
+            <div className="mb-8">
+              <h3 className="font-medium text-lg mb-2">Description</h3>
+              <p className="text-gray-700 whitespace-pre-line">{book.description}</p>
+            </div>
+          )}
         </div>
+      </div>
+      
+      {/* Reviews Section */}
+      <div className="mt-12">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="font-serif text-2xl font-bold text-bookburst-navy">Reader Reviews</h2>
+          
+          {isAuthenticated && !userHasReviewed && (
+            <Dialog open={reviewFormOpen} onOpenChange={setReviewFormOpen}>
+              <DialogTrigger asChild>
+                <Button>Write a Review</Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[600px]">
+                <DialogHeader>
+                  <DialogTitle>Write a Review</DialogTitle>
+                  <DialogDescription>
+                    Share your thoughts about "{book.title}"
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleSubmitReview} className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="rating">Rating (1-5 stars)</Label>
+                    <div className="flex items-center space-x-4">
+                      <Select 
+                        value={String(reviewRating)} 
+                        onValueChange={(value) => setReviewRating(Number(value))}
+                      >
+                        <SelectTrigger className="w-32">
+                          <SelectValue placeholder="Rating" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">1 Star</SelectItem>
+                          <SelectItem value="2">2 Stars</SelectItem>
+                          <SelectItem value="3">3 Stars</SelectItem>
+                          <SelectItem value="4">4 Stars</SelectItem>
+                          <SelectItem value="5">5 Stars</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <div className="flex">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <span key={star}>
+                            {star <= reviewRating ? (
+                              <Star className="h-5 w-5 text-yellow-400 fill-yellow-400" />
+                            ) : (
+                              <StarOff className="h-5 w-5 text-gray-300" />
+                            )}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="recommend">Would you recommend this book?</Label>
+                    <Select 
+                      value={reviewRecommend ? "yes" : "no"} 
+                      onValueChange={(value) => setReviewRecommend(value === "yes")}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="yes">Yes, I recommend it</SelectItem>
+                        <SelectItem value="no">No, I don't recommend it</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="content">Your Review</Label>
+                    <Textarea 
+                      id="content"
+                      value={reviewContent}
+                      onChange={(e) => setReviewContent(e.target.value)}
+                      placeholder="Share your thoughts on this book..."
+                      rows={6}
+                      required
+                    />
+                  </div>
+                  
+                  <Button 
+                    type="submit" 
+                    className="w-full" 
+                    disabled={submittingReview || !reviewContent.trim()}
+                  >
+                    {submittingReview ? 'Submitting...' : 'Submit Review'}
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
+        </div>
+        
+        {reviewsLoading ? (
+          <div className="flex justify-center items-center h-48">
+            <p>Loading reviews...</p>
+          </div>
+        ) : reviews.length === 0 ? (
+          <div className="text-center py-12 bg-gray-50 rounded-lg">
+            <h3 className="font-medium text-xl text-gray-600 mb-2">No Reviews Yet</h3>
+            <p className="text-gray-500">Be the first to review this book!</p>
+            
+            {!isAuthenticated && (
+              <div className="mt-6">
+                <Link to="/login">
+                  <Button>Sign In to Write a Review</Button>
+                </Link>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {reviews.map((review) => (
+              <ReviewCard key={review._id} review={review} showBookInfo={false} />
+            ))}
+            
+            {/* Pagination */}
+            {totalReviewPages > 1 && (
+              <Pagination className="mt-8">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious 
+                      onClick={() => handlePageChange(reviewsPage - 1)}
+                      className={reviewsPage <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    />
+                  </PaginationItem>
+                  
+                  {Array.from({ length: Math.min(5, totalReviewPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalReviewPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (reviewsPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (reviewsPage >= totalReviewPages - 2) {
+                      pageNum = totalReviewPages - 4 + i;
+                    } else {
+                      pageNum = reviewsPage - 2 + i;
+                    }
+                    
+                    return (
+                      <PaginationItem key={pageNum}>
+                        <PaginationLink 
+                          onClick={() => handlePageChange(pageNum)}
+                          isActive={pageNum === reviewsPage}
+                          className="cursor-pointer"
+                        >
+                          {pageNum}
+                        </PaginationLink>
+                      </PaginationItem>
+                    );
+                  })}
+                  
+                  <PaginationItem>
+                    <PaginationNext 
+                      onClick={() => handlePageChange(reviewsPage + 1)}
+                      className={reviewsPage >= totalReviewPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

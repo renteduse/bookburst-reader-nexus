@@ -1,4 +1,3 @@
-
 const express = require('express');
 const router = express.Router();
 const { check, validationResult } = require('express-validator');
@@ -122,23 +121,8 @@ router.post(
       });
       
       if (existingBookshelfItem) {
-        // Update status if already exists
-        existingBookshelfItem.status = status;
-        
-        // Set dates if applicable
-        if (status === 'reading' && !existingBookshelfItem.startDate) {
-          existingBookshelfItem.startDate = new Date();
-        }
-        if (status === 'finished' && !existingBookshelfItem.finishDate) {
-          existingBookshelfItem.finishDate = new Date();
-        }
-        
-        await existingBookshelfItem.save();
-        
-        // Populate book details
-        await existingBookshelfItem.populate('book');
-        
-        return res.json(existingBookshelfItem);
+        // Return a clear error message that the book is already in the bookshelf
+        return res.status(400).json({ message: 'This book is already in your bookshelf' });
       }
       
       // Create new bookshelf item
@@ -164,6 +148,12 @@ router.post(
       res.status(201).json(bookshelfItem);
     } catch (error) {
       console.error('Error adding book to bookshelf:', error);
+      
+      // Check if the error is a duplicate key error (MongoDB)
+      if (error.code === 11000 && error.keyPattern && error.keyPattern.user && error.keyPattern.book) {
+        return res.status(400).json({ message: 'This book is already in your bookshelf' });
+      }
+      
       res.status(500).json({ message: 'Server error adding book to bookshelf' });
     }
   }
