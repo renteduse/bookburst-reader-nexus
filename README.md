@@ -1,73 +1,95 @@
-# Welcome to your Lovable project
 
-## Project info
+# BookBurst - Social Reading Tracker
 
-**URL**: https://lovable.dev/projects/7a2db41a-056d-42fa-a241-98f3e7179163
+BookBurst is a personal reading log and social discovery platform for book lovers. Track your reading journey, share insights, and discover new books without the noise of social media.
 
-## How can I edit this code?
+![BookBurst Screenshot](https://images.unsplash.com/photo-1507842217343-583bb7270b66?ixlib=rb-1.2.1&auto=format&fit=crop&w=1650&q=80)
 
-There are several ways of editing your application.
+## Features
 
-**Use Lovable**
+- **My Bookshelf Management**: Track books as Reading, Finished, or Want to Read
+- **Review System**: Share your thoughts with ratings, reviews, and recommendations
+- **Explore Feed**: Discover trending books, recent reviews, and community favorites
+- **Public Profiles**: View other users' bookshelves and reading activity
+- **Reading History Timeline**: Visualize your reading journey over time
+- **Book Details**: Comprehensive information and community reviews for each book
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/7a2db41a-056d-42fa-a241-98f3e7179163) and start prompting.
+## Tech Stack
 
-Changes made via Lovable will be committed automatically to this repo.
+### Frontend
+- React
+- TypeScript
+- Tailwind CSS
+- shadcn/ui components
+- React Router
+- React Query
+- Cookie management for personalization
 
-**Use your preferred IDE**
+### Backend
+- Node.js
+- Express
+- MongoDB with Mongoose
+- JWT authentication
+- RESTful API design
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## Getting Started
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### Prerequisites
 
-Follow these steps:
+- Node.js (v14 or higher)
+- MongoDB (local installation or MongoDB Atlas)
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### Installation
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+1. Clone the repository
+2. Install frontend dependencies:
+```bash
+npm install
+```
 
-# Step 3: Install the necessary dependencies.
-npm i
+3. Install backend dependencies:
+```bash
+cd server
+npm install
+```
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+4. Create a `.env` file in the server directory with the following variables:
+```
+MONGODB_URI=mongodb://localhost:27017/bookburst
+JWT_SECRET=your_jwt_secret_key
+PORT=5000
+```
+
+### Running the Application
+
+1. Start the backend server:
+```bash
+cd server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+2. In a new terminal, start the frontend development server:
+```bash
+npm run dev
+```
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+3. Open your browser and navigate to `http://localhost:8080`
 
-**Use GitHub Codespaces**
+## Deployment
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+The application is set up to be easily deployed to any hosting service that supports Node.js applications.
 
-## What technologies are used for this project?
+For the frontend, you can build the production version:
+```bash
+npm run build
+```
 
-This project is built with:
+For the backend, the server is configured to serve the static frontend files in production mode.
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Contributing
 
-## How can I deploy this project?
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-Simply open [Lovable](https://lovable.dev/projects/7a2db41a-056d-42fa-a241-98f3e7179163) and click on Share -> Publish.
+## License
 
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+This project is licensed under the MIT License.
