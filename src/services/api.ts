@@ -38,6 +38,18 @@ export interface Book {
   genre?: string[];
 }
 
+export interface CreateBookInput {
+  title: string;
+  author: string;
+  description?: string;
+  coverImage?: string;
+  isbn?: string;
+  pageCount?: number;
+  publishedDate?: Date;
+  publisher?: string;
+  genre?: string[];
+}
+
 // Types for book status
 export type ReadingStatus = 'reading' | 'finished' | 'want-to-read';
 
@@ -140,6 +152,12 @@ export const booksAPI = {
     apiRequest<{ books: Book[]; total: number; page: number; pages: number }>(
       `/books/trending?page=${page}&limit=${limit}`
     ),
+    
+  createBook: (bookData: CreateBookInput) =>
+    apiRequest<Book>('/books', {
+      method: 'POST',
+      body: JSON.stringify(bookData),
+    }),
 };
 
 // API methods for bookshelf management
@@ -227,14 +245,14 @@ export const exploreAPI = {
   getTrending: (page = 1, limit = 10, genre?: string) => {
     const genreParam = genre ? `&genre=${encodeURIComponent(genre)}` : '';
     return apiRequest<{ books: Book[]; total: number; page: number; pages: number }>(
-      `/explore/trending?page=${page}&limit=${limit}${genreParam}`
+      `/books/trending?page=${page}&limit=${limit}${genreParam}`
     );
   },
   
   getRecentReviews: (page = 1, limit = 10, genre?: string) => {
     const genreParam = genre ? `&genre=${encodeURIComponent(genre)}` : '';
     return apiRequest<{ reviews: Review[]; total: number; page: number; pages: number }>(
-      `/explore/recent-reviews?page=${page}&limit=${limit}${genreParam}`
+      `/reviews/recent?page=${page}&limit=${limit}${genreParam}`
     );
   },
   

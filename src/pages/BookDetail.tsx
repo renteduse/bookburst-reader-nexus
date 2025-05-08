@@ -27,6 +27,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
 
 const BookDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -39,6 +47,10 @@ const BookDetail: React.FC = () => {
   const [isLoadingBook, setIsLoadingBook] = useState(true);
   const [isLoadingReviews, setIsLoadingReviews] = useState(true);
   const [isLoadingBookshelfItem, setIsLoadingBookshelfItem] = useState(true);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   
   // Review form state
   const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
@@ -74,15 +86,16 @@ const BookDetail: React.FC = () => {
     fetchBookDetails();
   }, [id, navigate]);
   
-  // Fetch reviews
+  // Fetch reviews with pagination
   useEffect(() => {
     const fetchReviews = async () => {
       if (!id) return;
       
       setIsLoadingReviews(true);
       try {
-        const reviewData = await reviewsAPI.getBookReviews(id);
+        const reviewData = await reviewsAPI.getBookReviews(id, currentPage);
         setReviews(reviewData.reviews);
+        setTotalPages(reviewData.pages);
       } catch (error) {
         console.error('Error fetching reviews:', error);
         toast.error('Failed to load reviews.');
@@ -92,7 +105,7 @@ const BookDetail: React.FC = () => {
     };
     
     fetchReviews();
-  }, [id]);
+  }, [id, currentPage]);
   
   // Fetch user's bookshelf item for this book if authenticated
   useEffect(() => {
@@ -178,7 +191,12 @@ const BookDetail: React.FC = () => {
         recommend: isRecommended
       });
       
-      setReviews([newReview, ...reviews]);
+      // Refresh the reviews list to include the new review
+      const reviewData = await reviewsAPI.getBookReviews(id!, 1);
+      setReviews(reviewData.reviews);
+      setCurrentPage(1);
+      setTotalPages(reviewData.pages);
+      
       toast.success('Your review has been published!');
       setIsReviewDialogOpen(false);
       setReviewContent('');
@@ -189,6 +207,11 @@ const BookDetail: React.FC = () => {
     } finally {
       setIsSubmittingReview(false);
     }
+  };
+  
+  const handlePageChange = (page: number) => {
+    if (page < 1 || page > totalPages) return;
+    setCurrentPage(page);
   };
   
   if (isLoadingBook) {
@@ -470,11 +493,60 @@ const BookDetail: React.FC = () => {
                   )}
                 </div>
               ) : (
-                <div className="space-y-6">
-                  {reviews.map((review) => (
-                    <ReviewCard key={review._id} review={review} />
-                  ))}
-                </div>
+                <>
+                  <div className="space-y-6">
+                    {reviews.map((review) => (
+                      <ReviewCard key={review._id} review={review} />
+                    ))}
+                  </div>
+                  
+                  {/* Pagination for reviews */}
+                  {totalPages > 1 && (
+                    <Pagination className="my-6">
+                      <PaginationContent>
+                        <PaginationItem>
+                          <PaginationPrevious 
+                            onClick={() => handlePageChange(currentPage - 1)}
+                            className={currentPage <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                          />
+                        </PaginationItem>
+                        
+                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                          // Show pages around current page
+                          let pageNum;
+                          if (totalPages <= 5) {
+                            pageNum = i + 1;
+                          } else if (currentPage <= 3) {
+                            pageNum = i + 1;
+                          } else if (currentPage >= totalPages - 2) {
+                            pageNum = totalPages - 4 + i;
+                          } else {
+                            pageNum = currentPage - 2 + i;
+                          }
+                          
+                          return (
+                            <PaginationItem key={pageNum}>
+                              <PaginationLink 
+                                onClick={() => handlePageChange(pageNum)}
+                                isActive={pageNum === currentPage}
+                                className="cursor-pointer"
+                              >
+                                {pageNum}
+                              </PaginationLink>
+                            </PaginationItem>
+                          );
+                        })}
+                        
+                        <PaginationItem>
+                          <PaginationNext 
+                            onClick={() => handlePageChange(currentPage + 1)}
+                            className={currentPage >= totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                          />
+                        </PaginationItem>
+                      </PaginationContent>
+                    </Pagination>
+                  )}
+                </>
               )}
             </TabsContent>
             
